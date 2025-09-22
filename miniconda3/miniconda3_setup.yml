@@ -39,19 +39,16 @@
       file:
         path: "{{ miniconda_installer }}"
         state: absent
-      when: conda_stat.stat.exists == false
+      when: not conda_stat.stat.exists
 
     - name: Check if conda init zsh block exists in .zshrc
       shell: "grep -q '^# >>> conda initialize >>>' {{ zshrc_file }}"
       register: conda_init_check
       ignore_errors: yes
+      changed_when: false
 
     - name: Initialize conda for zsh if not already initialized
-      shell: |
-        source {{ miniconda_dir }}/bin/activate
-        conda init zsh --all
-      args:
-        executable: /bin/zsh
+      command: "/bin/zsh -c 'source {{ miniconda_dir }}/bin/activate && conda init zsh --all'"
       environment:
         PATH: "{{ miniconda_dir }}/bin:{{ ansible_env.PATH }}"
       when: conda_init_check.rc != 0
@@ -63,4 +60,4 @@
 
     - name: Show installed conda version
       debug:
-        msg: "Conda version: {{ conda_ver.stdout }}"
+        msg: 'Conda version: {{ conda_ver.stdout }}'
