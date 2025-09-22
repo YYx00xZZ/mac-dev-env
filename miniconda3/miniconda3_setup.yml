@@ -3,9 +3,11 @@
   hosts: all
   become: no
   vars:
-    miniconda_dir: "{{ ansible_env.HOME }}/miniconda3"
+    home_dir: "{{ ansible_env.HOME }}"
+    miniconda_dir: "{{ home_dir }}/miniconda3"
     miniconda_installer: "{{ miniconda_dir }}/miniconda.sh"
     miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
+    zshrc_file: "{{ home_dir }}/.zshrc"
 
   tasks:
     - name: Ensure miniconda3 directory exists
@@ -14,24 +16,37 @@
         state: directory
         mode: '0755'
 
-    - name: Download Miniconda installer (arm64)
+    - name: Check if conda is already installed
+      stat:
+        path: "{{ miniconda_dir }}/bin/conda"
+      register: conda_stat
+
+    - name: Download Miniconda installer if Miniconda not installed
       get_url:
         url: "{{ miniconda_url }}"
         dest: "{{ miniconda_installer }}"
         mode: '0755'
         force: yes
+      when: not conda_stat.stat.exists
 
-    - name: Run Miniconda installer (silent mode)
+    - name: Run Miniconda installer (silent mode) if not already installed
       command: "bash {{ miniconda_installer }} -b -u -p {{ miniconda_dir }}"
       args:
         creates: "{{ miniconda_dir }}/bin/conda"
+      when: not conda_stat.stat.exists
 
-    - name: Remove installer script
+    - name: Remove installer script if it exists
       file:
         path: "{{ miniconda_installer }}"
         state: absent
+      when: conda_stat.stat.exists == false
 
-    - name: Initialize conda for zsh
+    - name: Check if conda init zsh block exists in .zshrc
+      shell: "grep -q '^# >>> conda initialize >>>' {{ zshrc_file }}"
+      register: conda_init_check
+      ignore_errors: yes
+
+    - name: Initialize conda for zsh if not already initialized
       shell: |
         source {{ miniconda_dir }}/bin/activate
         conda init zsh --all
@@ -39,6 +54,7 @@
         executable: /bin/zsh
       environment:
         PATH: "{{ miniconda_dir }}/bin:{{ ansible_env.PATH }}"
+      when: conda_init_check.rc != 0
 
     - name: Verify conda installation
       command: "{{ miniconda_dir }}/bin/conda --version"
