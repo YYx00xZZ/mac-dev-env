@@ -1,0 +1,37 @@
+---
+- name: Uninstall Miniconda3 (user-local, zsh)
+  hosts: all
+  become: no
+  vars:
+    home_dir: "{{ lookup('env','HOME') }}"
+    miniconda_dir: "{{ home_dir }}/miniconda3"
+    zshrc_file: "{{ home_dir }}/.zshrc"
+    ansible_python_interpreter: /opt/homebrew/bin/python3
+
+  tasks:
+    - name: Check if miniconda3 directory exists
+      stat:
+        path: "{{ miniconda_dir }}"
+      register: miniconda_stat
+
+    - name: Remove the miniconda3 directory if it exists
+      file:
+        path: "{{ miniconda_dir }}"
+        state: absent
+      when: miniconda_stat.stat.exists
+
+    - name: Check if .zshrc exists
+      stat:
+        path: "{{ zshrc_file }}"
+      register: zshrc_stat
+
+    - name: Remove conda initialization block from .zshrc if it exists
+      replace:
+        path: "{{ zshrc_file }}"
+        regexp: "(^# >>> conda initialize >>>.*?# <<< conda initialize <<<\n?)"
+        replace: ""
+      when: zshrc_stat.stat.exists
+
+    - name: Inform user
+      debug:
+        msg: "Miniconda3 has been removed and zsh initialization cleaned up (if present). Restart your shell."

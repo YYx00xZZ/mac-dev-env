@@ -1,0 +1,50 @@
+---
+- name: Install Miniconda3 on macOS (Apple Silicon, user-local, zsh)
+  hosts: all
+  become: no
+  vars:
+    miniconda_dir: "{{ ansible_env.HOME }}/miniconda3"
+    miniconda_installer: "{{ miniconda_dir }}/miniconda.sh"
+    miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
+
+  tasks:
+    - name: Ensure miniconda3 directory exists
+      file:
+        path: "{{ miniconda_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Miniconda installer (arm64)
+      get_url:
+        url: "{{ miniconda_url }}"
+        dest: "{{ miniconda_installer }}"
+        mode: '0755'
+        force: yes
+
+    - name: Run Miniconda installer (silent mode)
+      command: "bash {{ miniconda_installer }} -b -u -p {{ miniconda_dir }}"
+      args:
+        creates: "{{ miniconda_dir }}/bin/conda"
+
+    - name: Remove installer script
+      file:
+        path: "{{ miniconda_installer }}"
+        state: absent
+
+    - name: Initialize conda for zsh
+      shell: |
+        source {{ miniconda_dir }}/bin/activate
+        conda init zsh --all
+      args:
+        executable: /bin/zsh
+      environment:
+        PATH: "{{ miniconda_dir }}/bin:{{ ansible_env.PATH }}"
+
+    - name: Verify conda installation
+      command: "{{ miniconda_dir }}/bin/conda --version"
+      register: conda_ver
+      changed_when: false
+
+    - name: Show installed conda version
+      debug:
+        msg: "Conda version: {{ conda_ver.stdout }}"

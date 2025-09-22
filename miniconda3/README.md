@@ -1,0 +1,1 @@
+Run on localhost. Might need to restart terminal after setting up conda.
